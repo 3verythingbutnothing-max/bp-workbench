@@ -21,7 +21,7 @@
     "provision-user": "node --env-file-if-exists=.env --import tsx scripts/provision-user.ts"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3",
+    "@prisma/client": "7.10.1",
     "next": "15.5.28",
     "react": "19.2.3",
     "react-dom": "19.2.3",
