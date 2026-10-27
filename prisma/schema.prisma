@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ANALYST
+  MANAGER
+}
+enum WorkStatus {
+  DRAFT
+  SOURCING
+  IN_REVIEW
+  COMPLETE
+}
+enum SourceType {
+  MAKE
+  BUY
+}
+enum Eligibility {
+  NOT_VERIFIED
+  ELIGIBLE
+  ON_HOLD
+}
+enum SupplierStrategy {
+  GROW
+  MAINTAIN
+  EXIT
+}
+enum QuoteKind {
+  QUOTE
+  LTA
+  HISTORICAL
+}
+enum RfqStatus {
+  DRAFT
+  EXPORTED
+  CLOSED
+}
+enum ReviewStatus {
+  PENDING
+  PASSED
+  RETURNED
+  STALE
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String
+  role Role
+  passwordHash String
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  sessions Session[]
+  proposals Proposal[]
+  boms Bom[] @relation("BomAssignee")
+  editedBoms Bom[] @relation("BomEditor")
+  quotes Quote[]
+  rfqs Rfq[]
+  notifications Notification[]
+  audit AuditEntry[]
+}
+
+model Session {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+
+model LoginThrottle {
+  key String @id
+  count Int @default(0)
+  resetAt DateTime @db.Timestamptz(3)
+}
+
+model Contract {
+  id String @id @default(cuid())
+  number String @unique
+  name String
+  customer String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  proposals Proposal[]
+}
+
+model Proposal {
+  id String @id @default(cuid())
+  number String @unique
+  name String
+  customer String
+  contractId String
+  contract Contract @relation(fields:[contractId], references:[id])
+  ownerId String?
+  owner User? @relation(fields:[ownerId], references:[id])
+  materialDueDate DateTime @db.Date
+  bidType String @default("COMPETITIVE")
+  notes String @default("")
+  status WorkStatus @default(DRAFT)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  boms Bom[]
+  @@index([materialDueDate, status])
+}
+
+model Bom {
+  id String @id @default(cuid())
+  proposalId String
+  proposal Proposal @relation(fields:[proposalId],references:[id],onDelete:Cascade)
+  number String @unique
+  name String
+  quantity Decimal @db.Decimal(18,4)
+  assigneeId String?
+  assignee User? @relation("BomAssignee", fields:[assigneeId],references:[id])
+  lastEditedById String?
+  lastEditedBy User? @relation("BomEditor", fields:[lastEditedById], references:[id])
+  status WorkStatus @default(DRAFT)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  items BomItem[]
+  reviews Review[]
+}
+
+model BomItem {
+  id String @id @default(cuid())
+  bomId String
+  bom Bom @relation(fields:[bomId],references:[id],onDelete:Cascade)
+  partNumber String
+  description String
+  revision String
+  manufacturer String @default("")
+  manufacturerPartNumber String @default("")
+  commodityCode String @default("")
+  sourceType SourceType
+  parentId String?
+  parent BomItem? @relation("Hierarchy",fields:[parentId],references:[id],onDelete:Restrict)
+  children BomItem[] @relation("Hierarchy")
+  position Int
+  quantity Decimal @db.Decimal(18,4)
+  qualityClauses Json
+  selectedQuoteId String?
+  selectedQuote Quote? @relation(fields:[selectedQuoteId],references:[id])
+  selectionReason String @default("")
+  rfqLinks RfqItemBom[]
+  @@index([partNumber, revision])
+  @@index([bomId,position])
+}
+
+model Supplier {
+  id String @id @default(cuid())
+  name String @unique
+  email String
+  commodityCodes Json
+  eligibility Eligibility @default(NOT_VERIFIED)
+  strategy SupplierStrategy @default(MAINTAIN)
+  evidenceNote String @default("")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  quotes Quote[]
+}
+
+model Quote {
+  id String @id @default(cuid())
+  supplierId String
+  supplier Supplier @relation(fields:[supplierId],references:[id])
+  partNumber String
+  revision String
+  qualityClauses Json
+  quoteNumber String
+  validThrough DateTime @db.Date
+  currency String
+  leadTimeDays Int
+  kind QuoteKind
+  moq Decimal @db.Decimal(18,4)
+  tiers Json
+  nre Decimal @default(0) @db.Decimal(20,4)
+  tooling Decimal @default(0) @db.Decimal(20,4)
+  packaging Decimal @default(0) @db.Decimal(20,4)
+  freight Decimal @default(0) @db.Decimal(20,4)
+  otherCharges Decimal @default(0) @db.Decimal(20,4)
+  evidenceReference String
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  createdById String
+  createdBy User @relation(fields:[createdById],references:[id])
+  selectedBy BomItem[]
+  @@index([partNumber,revision])
+}
+
+model Rfq {
+  id String @id @default(cuid())
+  number String @unique
+  status RfqStatus @default(DRAFT)
+  version Int @default(1)
+  createdById String
+  createdBy User @relation(fields:[createdById],references:[id])
+  responseDueDate DateTime @db.Date
+  requestedValidThrough DateTime @db.Date
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  items RfqItem[]
+}
+
+model RfqItem {
+  id String @id @default(cuid())
+  rfqId String
+  rfq Rfq @relation(fields:[rfqId],references:[id],onDelete:Cascade)
+  partNumber String
+  revision String
+  qualityClauses Json
+  quantities Json
+  supplierIds Json
+  groupingKey String
+  bomItems RfqItemBom[]
+  @@unique([rfqId,groupingKey])
+  @@index([groupingKey])
+}
+
+model RfqItemBom {
+  id String @id @default(cuid())
+  rfqItemId String
+  rfqItem RfqItem @relation(fields:[rfqItemId],references:[id],onDelete:Cascade)
+  bomItemId String
+  bomItem BomItem @relation(fields:[bomItemId],references:[id],onDelete:Restrict)
+  @@unique([rfqItemId,bomItemId])
+}
+
+model Review {
+  id String @id @default(cuid())
+  bomId String
+  bom Bom @relation(fields:[bomId],references:[id],onDelete:Cascade)
+  bomVersion Int
+  requestedById String
+  reviewerId String?
+  status ReviewStatus @default(PENDING)
+  notes String @default("")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  decidedAt DateTime? @db.Timestamptz(3)
+  @@index([bomId,status])
+}
+
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  title String
+  message String
+  read Boolean @default(false)
+  entityId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId,read,createdAt])
+}
+
+model AuditEntry {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id])
+  action String
+  entityType String
+  entityId String
+  reason String @default("")
+  before Json?
+  after Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([createdAt])
+  @@index([entityType,entityId])
+}

@@ -1,0 +1,53 @@
+{
+  "name": "proposal-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "An independent, self-hosted Bids and Proposals workbench for engineering evaluation.",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3020",
+    "build": "prisma generate && next build",
+    "start": "next start --hostname 127.0.0.1 --port 3020",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "users:provision": "node --env-file-if-exists=.env --import tsx scripts/provision-user.ts",
+    "provision-user": "node --env-file-if-exists=.env --import tsx scripts/provision-user.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "next": "15.5.28",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.1",
+    "eslint-config-next": "15.5.28",
+    "prettier": "3.8.1",
+    "prisma": "6.19.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0",
+    "esbuild": "0.28.1",
+    "postcss": "8.5.32",
+    "sharp": "0.35.5"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}
